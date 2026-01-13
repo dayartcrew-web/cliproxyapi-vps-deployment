@@ -713,36 +713,52 @@ sudo systemctl restart cliproxyapi
 
 ### Quick Security Hardening
 
-**For Standard VPS:**
+Choose the security setup that matches your server environment:
 
-Run the automated security script:
+---
+
+#### **Option 1: Standard VPS Security**
+
+For clean VPS installations without existing web panels:
 
 ```bash
 sudo bash security-hardening.sh
 ```
 
-**For VPS Panel (CloudPanel/Plesk/cPanel) or Existing Nginx Setup:**
+**What this does:**
+1. ✅ Configure UFW firewall with proper rules
+2. ✅ Install and configure Fail2ban for bot protection
+3. ✅ Bind CLIProxyAPI to localhost only (127.0.0.1)
+4. ✅ Generate strong management keys
+5. ✅ Harden SSH configuration
+6. ✅ Optionally install Nginx reverse proxy with SSL
+
+**Best for:** Ubuntu/Debian VPS, DigitalOcean, Linode, AWS EC2, Vultr
+
+---
+
+#### **Option 2: VPS Panel Integration**
+
+For servers with existing control panels or Nginx configurations:
 
 ```bash
 # Integrates with existing Nginx configurations
 sudo bash vps_panel_security_integration.sh
 ```
 
-This will:
-1. Detect existing Nginx configurations
-2. Update (not replace) your current setup
-3. Add security headers and rate limiting
-4. Configure reverse proxy to CLIProxyAPI
-5. Preserve existing SSL certificates
-6. Compatible with CloudPanel, Plesk, cPanel
+**What this does:**
+1. ✅ Detect existing Nginx configurations automatically
+2. ✅ Update (not replace) your current setup
+3. ✅ Add security headers and rate limiting
+4. ✅ Configure reverse proxy to CLIProxyAPI
+5. ✅ Preserve existing SSL certificates
+6. ✅ Compatible with CloudPanel, Plesk, cPanel, DirectAdmin
 
-This will:
-1. Configure UFW firewall
-2. Install Fail2ban for bot protection
-3. Bind CLIProxyAPI to localhost only
-4. Generate strong management keys
-5. Harden SSH configuration
-6. Optionally install Nginx reverse proxy
+**Best for:** CloudPanel, Plesk, cPanel, DirectAdmin, existing Nginx setups
+
+---
+
+#### **Additional Security Features**
 
 **Block Search Engine Crawlers:**
 
@@ -751,7 +767,7 @@ This will:
 sudo bash block-crawlers.sh
 ```
 
-This adds robots.txt and no-index headers to prevent search engine indexing.
+Adds robots.txt and X-Robots-Tag headers to prevent search engine indexing.
 
 **Add CAPTCHA Protection (Cloudflare Turnstile):**
 
@@ -760,7 +776,11 @@ This adds robots.txt and no-index headers to prevent search engine indexing.
 sudo bash setup-turnstile.sh
 ```
 
-This requires human verification before accessing `/management.html`, blocking all bots.
+Requires human verification before accessing `/management.html`, blocking all bots.
+
+**Note:** CAPTCHA requires free Cloudflare Turnstile API keys from https://dash.cloudflare.com/turnstile
+
+---
 
 ### Essential Security Steps
 
