@@ -109,7 +109,6 @@ EOF
 pull_latest() {
     print_header "Pulling Latest Changes"
 
-    cd $INSTALL_DIR/CLIProxyAPI
 
     # Get current version
     local current_version=$(git describe --tags --always 2>/dev/null || echo "unknown")
@@ -138,19 +137,17 @@ pull_latest() {
 rebuild_docker() {
     print_header "Rebuilding Docker Container"
 
-    cd $INSTALL_DIR/CLIProxyAPI
-
     # Stop current service
     print_info "Stopping current service..."
-    docker compose down
+    docker_compose_exec down
 
     # Pull latest Docker image
     print_info "Pulling latest Docker image..."
-    docker compose pull
+    docker_compose_exec pull
 
     # Start service
     print_info "Starting service..."
-    docker compose up -d
+    docker_compose_exec up -d
 
     print_success "Docker container rebuilt and started"
 }
@@ -200,10 +197,9 @@ restore_backup() {
     rm -rf $INSTALL_DIR/auths
     cp -r $backup_path/auths $INSTALL_DIR/
 
-    # Restart service
-    cd $INSTALL_DIR/CLIProxyAPI
-    docker compose down
-    docker compose up -d
+    # Restart service (no cd needed)
+    docker_stop
+    docker_start
 
     print_success "Backup restored successfully"
 }
@@ -215,10 +211,9 @@ restore_backup() {
 health_check() {
     print_header "Running Health Check"
 
-    cd $INSTALL_DIR/CLIProxyAPI
 
     # Check if container is running
-    if docker compose ps | grep -q "Up"; then
+    if docker compose -f "$COMPOSE_FILE" ps | grep -q "Up"; then
         print_success "Container is running"
     else
         print_error "Container is not running!"
@@ -235,7 +230,7 @@ health_check() {
     fi
 
     # Check logs for errors
-    if docker compose logs --tail=50 2>&1 | grep -qi "error"; then
+    if docker_logs --tail=50 2>&1 | grep -qi "error"; then
         print_warning "Errors found in recent logs"
         print_info "Check logs with: docker compose logs -f"
     else
@@ -250,7 +245,6 @@ health_check() {
 rollback() {
     print_header "Rollback to Previous Version"
 
-    cd $INSTALL_DIR/CLIProxyAPI
 
     if git reflog show | grep -q "pull: Fast-forward"; then
         local previous_commit=$(git reflog show | grep "pull: Fast-forward" | head -n 2 | tail -n 1 | awk '{print $1}')
@@ -267,9 +261,9 @@ rollback() {
         git reset --hard $previous_commit
 
         # Rebuild
-        docker compose down
-        docker compose pull
-        docker compose up -d
+        docker_stop
+        docker compose -f "$COMPOSE_FILE" pull
+        docker_start
 
         print_success "Rollback completed"
     else
@@ -285,7 +279,6 @@ rollback() {
 fix_management_key() {
     print_header "Fixing Management Key"
 
-    cd $INSTALL_DIR/CLIProxyAPI
 
     # Generate new management key
     local NEW_KEY=$(openssl rand -hex 32)
@@ -340,7 +333,7 @@ EOF
 
     # Restart service
     print_info "Restarting service..."
-    docker compose restart
+    docker_restart
     sleep 5
 
     print_success "Management key updated!"
@@ -431,6 +424,13 @@ show_menu() {
     echo "  24) View logs directory"
     echo "  25) Clear logs"
     echo ""
+    echo -e "${YELLOW}── Security ──${NC}"
+    echo "  26) Run security hardening"
+    echo "  27) Run VPS panel security integration"
+    echo "  28) Block search engine crawlers"
+    echo "  29) Setup Cloudflare Turnstile (CAPTCHA)"
+    echo "  30) View SECURITY.md"
+    echo ""
     echo "  0) Exit"
     echo ""
 }
@@ -445,13 +445,12 @@ oauth_login() {
     
     print_header "Login to $provider"
     
-    cd $INSTALL_DIR/CLIProxyAPI
     
     print_info "Starting OAuth login for $provider..."
     print_info "Copy the URL and open in your browser to complete login."
     echo ""
     
-    docker compose exec cli-proxy-api ./CLIProxyAPI $flag -no-browser
+    docker_container_exec ./CLIProxyAPI $flag -no-browser
     
     echo ""
     print_info "After completing OAuth in browser, the account will be added automatically."
@@ -509,8 +508,7 @@ edit_config() {
         read -n 1 -r
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
-            cd $INSTALL_DIR/CLIProxyAPI
-            docker compose restart
+            docker_restart
             print_success "Service restarted"
         fi
     else
@@ -565,33 +563,243 @@ view_logs_dir() {
 
 clear_logs() {
     print_header "Clear Logs"
-    
-    local logs_dir="$INSTALL_DIR/logs"
-    
-    print_warning "This will delete all log files in $logs_dir"
+
+    print_warning "This will clear all CLIProxyAPI logs"
+    echo ""
+    echo "Logs to clear:"
+    echo "  1) Docker container logs (requires container restart)"
+    echo "  2) Host logs directory (/opt/cliproxyapi/logs)"
+    echo "  3) Both Docker and host logs"
+    echo ""
+    read -p "Select option (1/2/3) or N to cancel: " -n 1 -r
+    echo ""
+    echo ""
+
+    case $REPLY in
+        1)
+            print_info "Clearing Docker container logs..."
+
+            # Get container ID
+            CONTAINER_ID=$(docker compose -f "$COMPOSE_FILE" ps -q cli-proxy-api 2>/dev/null)
+
+            if [[ -z "$CONTAINER_ID" ]]; then
+                print_error "Container not running"
+                return 1
+            fi
+
+            # Truncate Docker logs (requires root)
+            print_info "Truncating Docker logs for container $CONTAINER_ID..."
+
+            # Find and truncate log file
+            LOG_FILE=$(docker inspect --format='{{.LogPath}}' $CONTAINER_ID 2>/dev/null)
+
+            if [[ -n "$LOG_FILE" ]] && [[ -f "$LOG_FILE" ]]; then
+                truncate -s 0 "$LOG_FILE" 2>/dev/null && print_success "Docker logs cleared" || {
+                    print_warning "Could not truncate log file directly. Recreating container..."
+                    docker_stop
+                    docker_start
+                    print_success "Container recreated (logs cleared)"
+                }
+            else
+                print_info "Recreating container to clear logs..."
+                docker_stop
+                docker_start
+                print_success "Container recreated (logs cleared)"
+            fi
+            ;;
+
+        2)
+            print_info "Clearing host logs directory..."
+            local logs_dir="$INSTALL_DIR/logs"
+
+            if [[ -d "$logs_dir" ]]; then
+                # Use find and delete to handle permission issues
+                find "$logs_dir" -type f -delete 2>/dev/null && \
+                    print_success "Host logs cleared" || \
+                    print_error "Failed to clear logs (permission denied?)"
+            else
+                print_info "Logs directory not found or empty"
+            fi
+            ;;
+
+        3)
+            print_info "Clearing all logs..."
+
+            # Clear Docker logs
+            CONTAINER_ID=$(docker compose -f "$COMPOSE_FILE" ps -q cli-proxy-api 2>/dev/null)
+
+            if [[ -n "$CONTAINER_ID" ]]; then
+                LOG_FILE=$(docker inspect --format='{{.LogPath}}' $CONTAINER_ID 2>/dev/null)
+
+                if [[ -n "$LOG_FILE" ]] && [[ -f "$LOG_FILE" ]]; then
+                    truncate -s 0 "$LOG_FILE" 2>/dev/null || {
+                        docker_stop
+                        docker_start
+                    }
+                else
+                    docker_stop
+                    docker_start
+                fi
+                print_success "Docker logs cleared"
+            fi
+
+            # Clear host logs
+            local logs_dir="$INSTALL_DIR/logs"
+            if [[ -d "$logs_dir" ]]; then
+                find "$logs_dir" -type f -delete 2>/dev/null
+                print_success "Host logs cleared"
+            fi
+
+            print_success "All logs cleared"
+            ;;
+
+        [Nn])
+            print_info "Cancelled"
+            return 0
+            ;;
+
+        *)
+            print_error "Invalid option"
+            return 1
+            ;;
+    esac
+}
+
+###############################################################################
+# Security Functions
+###############################################################################
+
+run_security_hardening() {
+    print_header "Security Hardening"
+
+    if [[ ! -f "./security-hardening.sh" ]] && [[ ! -f "/root/cliproxyapi-vps-deployment/security-hardening.sh" ]]; then
+        print_error "security-hardening.sh not found"
+        print_info "Please download the script from the repository first"
+        return 1
+    fi
+
+    print_info "This will configure comprehensive security for your VPS:"
+    echo "  - UFW firewall configuration"
+    echo "  - Fail2ban installation and setup"
+    echo "  - Bind CLIProxyAPI to localhost only"
+    echo "  - SSH hardening"
+    echo "  - Optional Nginx reverse proxy with SSL"
+    echo ""
     read -p "Continue? (y/N): " -n 1 -r
     echo
-    
+
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        if [[ -d "$logs_dir" ]]; then
-            rm -rf "$logs_dir"/*
-            print_success "Logs cleared"
+        if [[ -f "./security-hardening.sh" ]]; then
+            bash ./security-hardening.sh
         else
-            print_info "Logs directory not found"
-        fi
-        
-        # Also clear docker logs
-        print_info "Clear Docker logs too? (y/N)"
-        read -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            cd $INSTALL_DIR/CLIProxyAPI
-            docker compose down
-            docker compose up -d
-            print_success "Docker logs cleared (container recreated)"
+            bash /root/cliproxyapi-vps-deployment/security-hardening.sh
         fi
     else
         print_info "Cancelled"
+    fi
+}
+
+run_vps_panel_integration() {
+    print_header "VPS Panel Security Integration"
+
+    if [[ ! -f "./vps_panel_security_integration.sh" ]] && [[ ! -f "/root/cliproxyapi-vps-deployment/vps_panel_security_integration.sh" ]]; then
+        print_error "vps_panel_security_integration.sh not found"
+        print_info "Please download the script from the repository first"
+        return 1
+    fi
+
+    print_info "This will integrate CLIProxyAPI with your existing Nginx setup:"
+    echo "  - Detect existing Nginx configurations"
+    echo "  - Update (not replace) your current setup"
+    echo "  - Add security headers and rate limiting"
+    echo "  - Configure reverse proxy to CLIProxyAPI"
+    echo "  - Preserve existing SSL certificates"
+    echo "  - Compatible with CloudPanel, Plesk, cPanel"
+    echo ""
+    read -p "Continue? (y/N): " -n 1 -r
+    echo
+
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        if [[ -f "./vps_panel_security_integration.sh" ]]; then
+            bash ./vps_panel_security_integration.sh
+        else
+            bash /root/cliproxyapi-vps-deployment/vps_panel_security_integration.sh
+        fi
+    else
+        print_info "Cancelled"
+    fi
+}
+
+run_block_crawlers() {
+    print_header "Block Search Engine Crawlers"
+
+    if [[ ! -f "./block-crawlers.sh" ]] && [[ ! -f "/root/cliproxyapi-vps-deployment/block-crawlers.sh" ]]; then
+        print_error "block-crawlers.sh not found"
+        print_info "Please download the script from the repository first"
+        return 1
+    fi
+
+    print_info "This will prevent search engines from indexing your site:"
+    echo "  - Create robots.txt blocking all crawlers"
+    echo "  - Add X-Robots-Tag HTTP header"
+    echo "  - Update Nginx configuration"
+    echo ""
+    read -p "Continue? (y/N): " -n 1 -r
+    echo
+
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        if [[ -f "./block-crawlers.sh" ]]; then
+            bash ./block-crawlers.sh
+        else
+            bash /root/cliproxyapi-vps-deployment/block-crawlers.sh
+        fi
+    else
+        print_info "Cancelled"
+    fi
+}
+
+run_setup_turnstile() {
+    print_header "Setup Cloudflare Turnstile"
+
+    if [[ ! -f "./setup-turnstile.sh" ]] && [[ ! -f "/root/cliproxyapi-vps-deployment/setup-turnstile.sh" ]]; then
+        print_error "setup-turnstile.sh not found"
+        print_info "Please download the script from the repository first"
+        return 1
+    fi
+
+    print_info "This will add CAPTCHA protection to your management panel:"
+    echo "  - Require human verification to access /management.html"
+    echo "  - Block automated bots and scripts"
+    echo "  - Session-based access (1 hour validity)"
+    echo "  - Cloudflare-powered bot detection"
+    echo ""
+    print_warning "You will need Cloudflare Turnstile API keys (free)"
+    print_info "Get them at: https://dash.cloudflare.com/turnstile"
+    echo ""
+    read -p "Continue? (y/N): " -n 1 -r
+    echo
+
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        if [[ -f "./setup-turnstile.sh" ]]; then
+            bash ./setup-turnstile.sh
+        else
+            bash /root/cliproxyapi-vps-deployment/setup-turnstile.sh
+        fi
+    else
+        print_info "Cancelled"
+    fi
+}
+
+view_security_docs() {
+    print_header "Security Documentation"
+
+    if [[ -f "./SECURITY.md" ]]; then
+        less ./SECURITY.md
+    elif [[ -f "/root/cliproxyapi-vps-deployment/SECURITY.md" ]]; then
+        less /root/cliproxyapi-vps-deployment/SECURITY.md
+    else
+        print_error "SECURITY.md not found"
+        print_info "Download from: https://github.com/your-repo/cliproxyapi-vps-deployment"
     fi
 }
 
@@ -621,8 +829,7 @@ main() {
                 health_check
                 ;;
             --logs|-l)
-                cd $INSTALL_DIR/CLIProxyAPI
-                docker compose logs -f
+                docker_logs -f
                 ;;
             --fix-management|-m)
                 fix_management_key
@@ -722,25 +929,21 @@ main() {
                     health_check
                     ;;
                 8)
-                    cd $INSTALL_DIR/CLIProxyAPI
-                    docker compose logs -f
+                    docker_logs -f
                     ;;
                 9)
                     print_info "Restarting service..."
-                    cd $INSTALL_DIR/CLIProxyAPI
-                    docker compose restart
+                    docker_restart
                     print_success "Service restarted"
                     ;;
                 10)
                     print_info "Stopping service..."
-                    cd $INSTALL_DIR/CLIProxyAPI
-                    docker compose down
+                    docker_stop
                     print_success "Service stopped"
                     ;;
                 11)
                     print_info "Starting service..."
-                    cd $INSTALL_DIR/CLIProxyAPI
-                    docker compose up -d
+                    docker_start
                     print_success "Service started"
                     ;;
                 # Configuration
@@ -777,7 +980,7 @@ main() {
                     ;;
                 22)
                     list_accounts
-                    ;;
+                    ;
                 # Files
                 23)
                     view_auth_dir
@@ -787,6 +990,22 @@ main() {
                     ;;
                 25)
                     clear_logs
+                    ;;
+                # Security
+                26)
+                    run_security_hardening
+                    ;;
+                27)
+                    run_vps_panel_integration
+                    ;;
+                28)
+                    run_block_crawlers
+                    ;;
+                29)
+                    run_setup_turnstile
+                    ;;
+                30)
+                    view_security_docs
                     ;;
                 0)
                     print_info "Goodbye!"

@@ -44,7 +44,7 @@ Complete VPS deployment solution for CLIProxyAPI - an AI model proxy server that
 
 ```bash
 # Clone this repository
-git clone https://github.com/dayartcrew-web/cliproxyapi-vps-deployment.git
+git clone https://github.com/your-repo/cliproxyapi-vps-deployment.git
 cd cliproxyapi-vps-deployment
 
 # Run installation script
@@ -700,12 +700,109 @@ sudo systemctl restart cliproxyapi
 
 ## 🔒 Security
 
-### Secure Your Deployment
+### Comprehensive Security Guide
 
-#### 1. Use Strong API Keys
+**📖 See [SECURITY.md](SECURITY.md) for the complete security hardening guide** covering:
+- ✅ SSL/TLS Certificate Setup (Let's Encrypt)
+- ✅ Bot Protection (Fail2ban, Rate Limiting)
+- ✅ Search Engine Blocking (No-Index/No-Follow)
+- ✅ XSS & Injection Prevention
+- ✅ Network Security (Firewall, Docker Isolation)
+- ✅ Authentication & Access Control
+- ✅ Monitoring & Logging
+
+### Quick Security Hardening
+
+**For Standard VPS:**
+
+Run the automated security script:
 
 ```bash
-# Generate new secure keys
+sudo bash security-hardening.sh
+```
+
+**For VPS Panel (CloudPanel/Plesk/cPanel) or Existing Nginx Setup:**
+
+```bash
+# Integrates with existing Nginx configurations
+sudo bash vps_panel_security_integration.sh
+```
+
+This will:
+1. Detect existing Nginx configurations
+2. Update (not replace) your current setup
+3. Add security headers and rate limiting
+4. Configure reverse proxy to CLIProxyAPI
+5. Preserve existing SSL certificates
+6. Compatible with CloudPanel, Plesk, cPanel
+
+This will:
+1. Configure UFW firewall
+2. Install Fail2ban for bot protection
+3. Bind CLIProxyAPI to localhost only
+4. Generate strong management keys
+5. Harden SSH configuration
+6. Optionally install Nginx reverse proxy
+
+**Block Search Engine Crawlers:**
+
+```bash
+# Prevent Google, Bing, etc. from indexing your site
+sudo bash block-crawlers.sh
+```
+
+This adds robots.txt and no-index headers to prevent search engine indexing.
+
+**Add CAPTCHA Protection (Cloudflare Turnstile):**
+
+```bash
+# Protect management panel with CAPTCHA
+sudo bash setup-turnstile.sh
+```
+
+This requires human verification before accessing `/management.html`, blocking all bots.
+
+### Essential Security Steps
+
+#### 1. SSL/TLS Certificate (Recommended)
+
+**With Nginx + Let's Encrypt:**
+
+```bash
+# Install Nginx and Certbot
+sudo apt install nginx certbot python3-certbot-nginx -y
+
+# Obtain certificate
+sudo certbot --nginx -d your-domain.com
+
+# Auto-renewal is configured automatically
+```
+
+**Configuration:** See [SECURITY.md](SECURITY.md) for complete Nginx reverse proxy setup.
+
+#### 2. Firewall Protection
+
+```bash
+# Enable UFW
+sudo ufw enable
+
+# Allow HTTPS
+sudo ufw allow 443/tcp
+
+# Block direct access to CLIProxyAPI port
+sudo ufw allow from 127.0.0.1 to any port 8317
+
+# Check status
+sudo ufw status
+```
+
+#### 3. Strong API Keys
+
+```bash
+# Generate secure keys (128-bit minimum)
+openssl rand -hex 16
+
+# For management key (256-bit recommended)
 openssl rand -hex 32
 ```
 
@@ -925,13 +1022,19 @@ tls:
 - `install.sh` - Automated VPS installation
 - `update.sh` - Update manager with backup/restore
 - `uninstall.sh` - Safe uninstallation script
+- `security-hardening.sh` - Automated security hardening
+- `vps_panel_security_integration.sh` - VPS panel integration (CloudPanel/Plesk/cPanel)
+- `setup-turnstile.sh` - Cloudflare Turnstile CAPTCHA protection
+- `block-crawlers.sh` - Prevent search engine indexing (no-index/no-follow)
 - `config.yaml` - Configuration template
 - `cliproxyapi.service` - Systemd service file
 - `migrate-auth-path.sh` - Auth directory path migration for existing installations
 - `fix-auth-persistence.sh` - Fix auth file persistence across restarts
 - `fix-management-panel.sh` - Diagnose and fix management panel 404 issues
+- `SECURITY.md` - Complete security hardening guide
 - `MANAGEMENT_API.md` - Complete Management API reference
 - `QUICK_START.md` - Quick command reference
+- `CLAUDE.md` - Developer documentation
 - `README.md` - This file
 
 ## 📄 License

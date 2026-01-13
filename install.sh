@@ -127,7 +127,6 @@ clone_repository() {
 
     if [[ -d "$INSTALL_DIR/CLIProxyAPI" ]]; then
         print_warning "CLIProxyAPI directory already exists. Pulling latest changes..."
-        cd $INSTALL_DIR/CLIProxyAPI
         git pull origin main
     else
         print_info "Cloning repository..."
@@ -275,8 +274,8 @@ After=docker.service
 Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory=$INSTALL_DIR/CLIProxyAPI
-ExecStart=/usr/bin/docker compose up -d
-ExecStop=/usr/bin/docker compose down
+ExecStart=/usr/bin/docker_start
+ExecStop=/usr/bin/docker_stop
 TimeoutStartSec=0
 
 [Install]
@@ -317,13 +316,12 @@ configure_firewall() {
 start_service() {
     print_header "Starting CLIProxyAPI Service"
 
-    cd $INSTALL_DIR/CLIProxyAPI
 
     if docker compose ps | grep -q "Up"; then
         print_warning "Service is already running"
     else
         print_info "Starting service..."
-        docker compose up -d
+        docker_start
 
         # Wait for service to be healthy (increased timeout)
         print_info "Waiting for service to start..."
@@ -385,7 +383,6 @@ ${BLUE}════════════════════════�
 ${BLUE}═══════════════════════════════════════════════════════════════${NC}
 ${BLUE}OAUTH LOGIN COMMANDS (Add AI Providers)${NC}
 ${BLUE}═══════════════════════════════════════════════════════════════${NC}
-  cd $INSTALL_DIR/CLIProxyAPI
 
   # Gemini CLI (Google account)
   docker compose exec cli-proxy-api ./CLIProxyAPI -login -no-browser
@@ -421,9 +418,88 @@ ${YELLOW}═══════════════════════�
   - Management URL with key: http://${VPS_IP}:8317/v0/management?key=${MGMT_KEY}
   - Keep these keys secure and don't share them
 
+${GREEN}═══════════════════════════════════════════════════════════════${NC}
+${GREEN}RECOMMENDED NEXT STEPS - SECURITY HARDENING${NC}
+${GREEN}═══════════════════════════════════════════════════════════════${NC}
+
+Your CLIProxyAPI is now running but NOT secured. We highly recommend
+setting up security measures to protect your service:
+
+${YELLOW}Option 1: Standard VPS Security${NC}
+  sudo bash security-hardening.sh
+
+  This will:
+  - Configure UFW firewall
+  - Install Fail2ban for bot protection
+  - Bind CLIProxyAPI to localhost only
+  - Harden SSH configuration
+  - Optionally setup Nginx reverse proxy with SSL
+
+${YELLOW}Option 2: VPS Panel Integration (CloudPanel/Plesk/cPanel)${NC}
+  sudo bash vps_panel_security_integration.sh
+
+  This will:
+  - Detect and update existing Nginx configurations
+  - Add security headers and rate limiting
+  - Configure reverse proxy to CLIProxyAPI
+  - Preserve existing SSL certificates
+
+${YELLOW}Additional Security Features:${NC}
+  - Block search engine crawlers:
+    sudo bash block-crawlers.sh
+
+  - Add CAPTCHA protection to management panel:
+    sudo bash setup-turnstile.sh
+
 ${BLUE}Documentation:${NC} https://help.router-for.me/
+${BLUE}Security Guide:${NC} See SECURITY.md in this directory
 
 EOF
+
+    # Offer to run security hardening
+    echo ""
+    read -p "Would you like to run security hardening now? (y/N): " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        echo ""
+        echo "Select security setup:"
+        echo "  1) Standard VPS security (security-hardening.sh)"
+        echo "  2) VPS Panel integration (vps_panel_security_integration.sh)"
+        echo "  3) Skip for now"
+        echo ""
+        read -p "Choose option (1-3): " -n 1 -r security_choice
+        echo ""
+
+        case $security_choice in
+            1)
+                if [[ -f "./security-hardening.sh" ]]; then
+                    print_info "Running security hardening..."
+                    bash ./security-hardening.sh
+                else
+                    print_error "security-hardening.sh not found in current directory"
+                fi
+                ;;
+            2)
+                if [[ -f "./vps_panel_security_integration.sh" ]]; then
+                    print_info "Running VPS panel integration..."
+                    bash ./vps_panel_security_integration.sh
+                else
+                    print_error "vps_panel_security_integration.sh not found in current directory"
+                fi
+                ;;
+            3)
+                print_info "You can run security scripts later"
+                ;;
+            *)
+                print_warning "Invalid option. You can run security scripts later"
+                ;;
+        esac
+    else
+        print_info "Security setup skipped. You can run it later with:"
+        echo "  sudo bash security-hardening.sh"
+        echo "  or"
+        echo "  sudo bash vps_panel_security_integration.sh"
+    fi
 }
 
 ###############################################################################
