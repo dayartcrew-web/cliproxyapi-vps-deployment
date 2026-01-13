@@ -44,7 +44,7 @@ Complete VPS deployment solution for CLIProxyAPI - an AI model proxy server that
 
 ```bash
 # Clone this repository
-git clone https://github.com/your-repo/cliproxyapi-vps-deployment.git
+git clone https://github.com/dayartcrew-web/cliproxyapi-vps-deployment.git
 cd cliproxyapi-vps-deployment
 
 # Run installation script
