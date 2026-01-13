@@ -1,0 +1,241 @@
+# CLIProxyAPI VPS Deployment - GitIgnore
+# Prevents committing sensitive, temporary, and backup files
+
+###############################################################################
+# Backup Files
+###############################################################################
+
+# Script backups
+*.backup
+*.backup-*
+*.bak
+*.old
+*.orig
+
+# Timestamped backups
+*backup_*
+*backup-*
+
+###############################################################################
+# Temporary Files
+###############################################################################
+
+# Temporary script files
+*.tmp
+*.temp
+*~
+
+# Swap files
+*.swp
+*.swo
+*.swn
+
+###############################################################################
+# Log Files
+###############################################################################
+
+# Generic logs
+*.log
+logs/
+*.log.*
+
+# Installation logs
+install-*.log
+uninstall-*.log
+update-*.log
+
+###############################################################################
+# Sensitive Data
+###############################################################################
+
+# API keys and credentials
+api-keys.txt
+*credentials*
+*secrets*
+*.key
+*.pem
+*.crt
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Configuration with secrets
+config.local.yaml
+config.production.yaml
+*-local.yaml
+
+###############################################################################
+# OS-Specific Files
+###############################################################################
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+.Trash-*
+
+###############################################################################
+# IDE and Editor Files
+###############################################################################
+
+# VSCode
+.vscode/
+*.code-workspace
+
+# JetBrains IDEs
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+[._]*.s[a-v][a-z]
+[._]*.sw[a-p]
+[._]s[a-rt-v][a-z]
+[._]ss[a-gi-z]
+[._]sw[a-p]
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+###############################################################################
+# Testing and Development
+###############################################################################
+
+# Test files
+test-*.sh
+*.test
+test/
+tests/
+
+# Development notes
+TODO.md
+NOTES.md
+DRAFT.md
+dev-notes/
+
+###############################################################################
+# Downloaded/Generated Files
+###############################################################################
+
+# Docker compose overrides (local only)
+docker-compose.override.yml
+
+# Downloaded scripts or tools
+get-docker.sh
+
+# Generated documentation
+docs/build/
+*.pdf
+
+###############################################################################
+# Archives
+###############################################################################
+
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.tar.bz2
+*.rar
+*.7z
+
+###############################################################################
+# Project Specific
+###############################################################################
+
+# CLIProxyAPI backups created by uninstall script
+cliproxyapi-backup-*/
+
+# Update script backups
+backups/
+
+# Nginx backup configs
+*.nginx.backup
+sites-available/*.backup
+
+# Local testing configs
+*.local.sh
+local-*.sh
+
+# Output files
+output/
+dist/
+
+###############################################################################
+# Cache and Build
+###############################################################################
+
+# npm
+node_modules/
+package-lock.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+
+# General cache
+.cache/
+*.cache
+
+###############################################################################
+# Security Scan Results
+###############################################################################
+
+# Security reports
+security-scan-*.txt
+security-report-*.html
+vulnerabilities-*.json
+
+###############################################################################
+# Claude Code / AI Assistant
+###############################################################################
+
+# Claude conversation history (if any)
+.claude/
+claude-history/
+
+###############################################################################
+# Git Related
+###############################################################################
+
+# Git patch files
+*.patch
+*.diff
+
+# Git merge files
+*.orig
+*.BACKUP.*
+*.BASE.*
+*.LOCAL.*
+*.REMOTE.*
+*_BACKUP_*
+*_BASE_*
+*_LOCAL_*
+*_REMOTE_*
