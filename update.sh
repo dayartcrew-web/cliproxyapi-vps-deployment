@@ -980,7 +980,7 @@ main() {
                     ;;
                 22)
                     list_accounts
-                    ;
+                    ;;
                 # Files
                 23)
                     view_auth_dir
